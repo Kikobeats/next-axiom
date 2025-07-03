@@ -6,6 +6,20 @@ import { LogLevel, Logger, RequestReport } from './logger';
 import { type NextRequest, type NextResponse } from 'next/server';
 import { EndpointType, RequestJSON, requestToJSON } from './shared';
 
+// Helper function to handle logger flushing with dynamic waitUntil loading
+async function flushLogger(logger: Logger, showErrors?: boolean) {
+  const flushPromise = showErrors === true 
+    ? logger.flush() 
+    : logger.flush().catch(() => {});
+  
+  if (isVercel) {
+    const { waitUntil } = await import('@vercel/functions');
+    waitUntil(flushPromise);
+  } else {
+    await flushPromise;
+  }
+}
+
 export function withAxiomNextConfig(nextConfig: NextConfig): NextConfig {
   return {
     ...nextConfig,
@@ -60,6 +74,8 @@ type AxiomRouteHandlerConfig = {
   // override default log levels for notFound and redirect
   notFoundLogLevel?: LogLevel; // defaults to LogLevel.warn
   redirectLogLevel?: LogLevel; // defaults to LogLevel.info
+  // whether to show flush errors to users (defaults to false)
+  showErrors?: boolean;
 };
 
 export function withAxiomRouteHandler(handler: NextHandler, config?: AxiomRouteHandlerConfig): NextHandler {
@@ -131,11 +147,7 @@ export function withAxiomRouteHandler(handler: NextHandler, config?: AxiomRouteH
       log.attachResponseStatus(result.status);
 
       // flush the logger along with the child logger
-      if (isVercel) {
-        waitUntil(logger.flush());
-      } else {
-        await logger.flush();
-      }
+      await flushLogger(logger, config?.showErrors);
       return result;
     } catch (error: any) {
       // capture request endTime first for more accurate reporting
@@ -181,11 +193,7 @@ export function withAxiomRouteHandler(handler: NextHandler, config?: AxiomRouteH
       log.log(logLevel, error.message, { error });
       log.attachResponseStatus(statusCode);
 
-      if (isVercel) {
-        waitUntil(logger.flush());
-      } else {
-        await logger.flush();
-      }
+      await flushLogger(logger, config?.showErrors);
       throw error;
     }
   };
