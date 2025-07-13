@@ -84,7 +84,7 @@ jobs:
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org'
       - run: pnpm install
-      - run: pnpm publish --access public
+      - run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTOMATION_TOKEN }}
       - uses: softprops/action-gh-release@v1
